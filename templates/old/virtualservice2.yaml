@@ -1,0 +1,34 @@
+{{- if not (empty $.Values.hostnames2) }}
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: {{ $.Values.appName }}
+  namespace: istio-system
+spec:
+  gateways:
+  - default
+  hosts:
+  {{- range $key, $value := .Values.hostnames2 }}
+  - {{ $value.host }}.{{ if (empty $value.domain) }}{{ $.Values.rootDomain }}{{ else }}{{ $value.domain }}{{ end }}
+  {{- end }}
+  {{- if .Values.listemRootDomain }}
+  - {{ $.Values.rootDomain }}
+  {{- end }}
+  http:
+  {{- if .Values.redirectToRootDomain }}
+  - match:
+    - authority:
+        exact:
+          {{ $.Values.hostnames }}.{{ $.Values.rootDomain }}
+    redirect:
+      authority: {{ $.Values.rootDomain }}
+  {{- end }}
+  - match:
+    - uri:
+        prefix: /
+    route:
+    - destination:
+        host: {{ $.Values.appName }}.{{ $.Values.namespace }}.svc.cluster.local
+        port:
+          number: {{ .Values.service.port }}
+{{- end }}

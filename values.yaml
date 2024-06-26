@@ -1,0 +1,25 @@
+container: {}
+kind: Deployment
+imageRepository: "<account-id>.dkr.ecr.<region>.amazonaws.com"
+imagePullPolicy: Always
+resources:
+  requests:
+    cpu: "0.25"
+    memory: 200Mi
+  limits:
+    cpu: "0.25"
+    memory: 200Mi
+autoscaling:
+  minReplicas: 2
+  maxReplicas: 4
+  targetCPUUtilizationPercentage: 80
+serviceAccount:
+  create: false
+  roleArn: "arn:aws:iam::<AWS_ACCOUNT_ID>:role/<IAM_ROLE_NAME>"
+  automountServiceAccountToken: true
+service:
+  type: NodePort
+  protocol: TCP
+listemRootDomain: false
+redirectToRootDomain: false
+EbsStorageClassName: gp2

@@ -1,0 +1,154 @@
+{{- if eq $.Values.kind "StatefulSet" }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ $.Values.appName }}
+  labels:
+    app: {{ $.Values.appName }}
+spec:
+  serviceName: {{ $.Values.appName }}
+  replicas: {{ $.Values.replicas }}
+  volumeClaimTemplates:
+    {{- range $key, $value := .Values.storages }} 
+    - metadata:
+        name: {{ $.Values.appName }}-pvc
+      spec:
+        storageClassName: {{ $.Values.EbsStorageClassName }}
+        volumeName: {{ $.Values.appName }}-pv
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: {{ $value.pvStorageSize }}
+    {{- end }}
+  selector:
+    matchLabels:
+      app: {{ $.Values.appName }}
+  template:
+    metadata:
+      labels:
+        app: {{ $.Values.appName }}
+    spec:
+      {{- if $.Values.serviceAccount.create }}
+      serviceAccountName: {{ $.Values.appName }}
+      {{- end }}
+      {{- if not (empty $.Values.volumes) }}
+      volumes:
+        {{- range $.Values.volumes }}
+        - name: {{ .name | quote }}
+          configMap:
+            name: {{ .cmName | quote }}
+        {{- end }}
+      {{- end }}
+      containers:
+      {{- range $key, $value := .Values.containers }}
+      - name: {{ $value.name }}
+        image: "{{ $.Values.imageRepository }}/{{ $.Values.imageName }}:{{ $value.imageVersion }}"
+        imagePullPolicy: {{ $.Values.imagePullPolicy }}
+        {{- if not (empty $value.port) }}
+        ports:
+          - containerPort: {{ $value.port }}
+        {{- end }}
+        {{- if not (empty $value.volumeMounts) }}
+        volumeMounts:
+          {{- range $value.volumeMounts }}
+          - name: {{ .name | quote }}
+            readOnly: {{ .readOnly }}
+            mountPath: {{ .mountPath | quote }}
+            subPath: {{ .subPath | quote }}
+          {{- end }}
+        {{- end }}
+        {{- if not (empty $value.command) }}
+        command: [ {{ join "," $value.command }} ]
+        {{- end }}
+        {{- if not (empty $value.args) }}
+        args: [ {{ join "," $value.args }} ]
+        {{- end }}
+        resources:
+          requests:
+            cpu: "{{ $.Values.resources.requests.cpu }}"
+            memory: {{ $.Values.resources.requests.memory }}
+          limits:
+            cpu: "{{ $.Values.resources.limits.cpu }}"
+            memory: {{ $.Values.resources.limits.memory }}
+        {{- if or (not (empty $.Values.envVarsFromSsm)) (not (empty $.Values.envVars)) }}
+        env:
+          {{- range $envVar, $value := $.Values.envVars }}
+          - name: {{ $envVar }}
+            value: {{ $value | quote }}
+          {{- end }}
+          {{- range $envVar, $ssmPath := $.Values.envVarsFromSsm }}
+          {{- if not (empty $ssmPath) }}
+          - name: {{ $envVar }}
+            valueFrom:
+              secretKeyRef:
+                name: {{ $.Values.appName }}
+                key: {{ $envVar }}
+          {{- end }}
+          {{- end }}
+        {{- end }}
+        {{- if $value.readinessProbe }}
+        readinessProbe:
+          tcpSocket:
+            port: {{ $value.port }}
+          initialDelaySeconds: 15
+          periodSeconds: 15
+          timeoutSeconds: 30
+          successThreshold: 1
+          failureThreshold: 5
+        {{- end }}
+        {{- if $value.livenessProbe }}
+        livenessProbe:
+          tcpSocket:
+            port: {{ $value.port }}
+          initialDelaySeconds: 30
+          periodSeconds: 15
+          timeoutSeconds: 30
+          successThreshold: 1
+          failureThreshold: 5
+        {{- end }}
+      {{- end }}
+      {{- if not (empty $.Values.initContainers) }}
+      initContainers:
+      {{- range $key, $value := .Values.initContainers }}
+      - name: {{ $value.name }}
+        image: "{{ $.Values.imageRepository }}/{{ $.Values.imageName }}:{{ $value.imageVersion }}"
+        imagePullPolicy: Always
+        {{- if not (empty $value.port) }}
+        ports:
+          - containerPort: {{ $value.port }}
+        {{- end }}
+        {{- if not (empty $value.volumeMounts) }}
+        volumeMounts:
+          {{- range $value.volumeMounts }}
+          - name: {{ .name | quote }}
+            readOnly: {{ .readOnly }}
+            mountPath: {{ .mountPath | quote }}
+            subPath: {{ .subPath | quote }}
+          {{- end }}
+        {{- end }}
+        {{- if not (empty $value.command) }}
+        command: [ {{ join "," $value.command }} ]
+        {{- end }}
+        {{- if not (empty $value.args) }}
+        args: [ {{ join "," $value.args }} ]
+        {{- end }}
+        {{- if or (not (empty $.Values.envVarsFromSsm)) (not (empty $.Values.envVars)) }}
+        env:
+          {{- range $envVar, $value := $.Values.envVars }}
+          - name: {{ $envVar }}
+            value: {{ $value | quote }}
+          {{- end }}
+          {{- range $envVar, $ssmPath := $.Values.envVarsFromSsm }}
+          {{- if not (empty $ssmPath) }}
+          - name: {{ $envVar }}
+            valueFrom:
+              secretKeyRef:
+                name: {{ $.Values.appName }}
+                key: {{ $envVar }}
+          {{- end }}
+          {{- end }}
+        {{- end }}
+      {{- end }}
+      {{- end }}
+{{- end }}

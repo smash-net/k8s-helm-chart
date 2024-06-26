@@ -1,0 +1,17 @@
+{{- if not (empty $.Values.storages) }}
+{{- range $key, $value := .Values.storages }} 
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: {{ $.Values.appName }}-pv
+spec:
+  capacity:
+    storage: {{ $value.pvStorageSize }}
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: {{ $.Values.EbsStorageClassName }}
+  hostPath:
+    path: {{ $value.pvHostPath }}
+    type: DirectoryOrCreate
+{{- end }}
+{{- end }}

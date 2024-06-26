@@ -1,0 +1,31 @@
+{{- if .Values.albIngressController.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ $.Values.appName }}
+  namespace: {{ $.Values.namespace }}
+  labels:
+    app: {{ $.Values.appName }}
+  annotations:
+    alb.ingress.kubernetes.io/group.name: {{ $.Values.albIngressController.groupName }}
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS": {{ $.Values.albIngressController.listenPorts }}}]'
+    alb.ingress.kubernetes.io/certificate-arn: {{ $.Values.albIngressController.certificateArn }}
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/success-codes: 200,400,404,405
+    alb.ingress.kubernetes.io/target-type: instance
+    kubernetes.io/ingress.class: alb
+spec:
+  rules:
+  {{- range $key, $value := .Values.hostnames }}
+  - host: {{ $value.host }}.{{ if (empty $value.customDomain) }}{{ $.Values.defaultDomain }}{{ else }}{{ $value.customDomain }}{{ end }}
+    http:
+      paths:
+      - backend:
+          service:
+            name: {{ $.Values.appName }}
+            port:
+              number: {{ $.Values.service.port }}
+        path: /
+        pathType: Prefix
+  {{- end }}
+{{- end }}
